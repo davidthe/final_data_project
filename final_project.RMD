@@ -1,0 +1,140 @@
+---
+title: "final project"
+output: html_notebook
+---
+first we are going to load the files  
+
+```{r}
+
+Input = "C:/Repositories/final project/data/"
+load(paste0(Input,"mat.f.coding.RData"), verbose = "TRUE")
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+Now we choose part from the body that we are going to do reserch on
+```{r}
+load(paste0(Input,"pheno.f.RData"), verbose = "TRUE")
+ts.list = as.character(unique(pheno.f$SMTSD))
+print(ts.list[53])
+```
+we choose the whole blood as the body part we inspect
+
+now we want to filter the data
+delete genes with low values - with 80% of expression is 0.1.
+
+```{r}
+get.raw.tissue.edata<-function(tissue.name, mat.f.coding, pheno.f){
+ tiss.cols.1 = which(pheno.f$SMTSD %in% tissue.name)
+ mat.1 = mat.f.coding[, tiss.cols.1]
+ return(mat.1)
+}
+```
+
+```{r}
+i = 53
+tmp.tissue = ts.list[i]
+print(paste0("loading ", tmp.tissue, " edata"))
+reads.src1 = get.raw.tissue.edata(tmp.tissue, mat.f.coding, pheno.f)
+t.reads.src = t(reads.src1)
+```
+
+```{r}
+#delete genes with low values - with 80% of expression is 0.1.
+vec.1 = apply(reads.src1 , 1, function(x) length(which( x > log(0.1+1, 2) )))
+row.index = which(vec.1 > (0.8*(ncol(reads.src1 ))))
+# leave just rows with expression per at least 80% of the samples
+src.reads = reads.src1 [row.index, ]
+```
+7786802 elemnts in reads.src1
+4500243 elemnts after filter
+
+
+```{r}
+#delete genes with variance = 0
+ var.data <- apply(src.reads, 1, var) #generate variance of each row - gene
+ low.var.indxs = which(var.data == 0)
+ if(length(low.var.indxs) > 0)
+ {
+ data.free = src.reads
+ #now we get smaller matrix, with no genes with variance 0
+ src.reads <- data.free[-low.var.indxs,]
+ }
+```
+
+now we delete outliers 
+The adjacency function needs WGCNA package installed
+
+
+```{r}
+install.packages("BiocManager")
+BiocManager::install("WGCNA")
+```
+
+```{r}
+remove.outliers.with.SD<-function(t.reads.src)
+{
+ #remove outliers
+ #cluster the samples and not the genes to find outliers
+ A = adjacency(t(t.reads.src), type = "distance")
+ #the connectivity of each human. -1 is to remove the diagonal, the cor to itself
+ k = as.numeric(apply(A,2,sum))-1
+ Z.k = scale(k) #standardized k
+ thresholdZ.k = -3 #standard deviation
+ outlierColor = ifelse(Z.k<thresholdZ.k,"red","black")#the red is the outlier
+ my.outliers = which(outlierColor == "red")
+ #printing the outlier samples
+ my.outliers.samp = (rownames(t.reads.src))[my.outliers]
+ print("outlier samples to remove")
+ print(my.outliers.samp)
+
+ my.good.samples = which(outlierColor == "black")
+ my.good.samples.names = (rownames(t.reads.src))[my.good.samples]
+ #printing the outlier samples
+ #print(my.good.samples.names)
+ #this is the final mat after outliers removal
+ t.reads.src = t.reads.src[my.good.samples.names, ]
+ return(t.reads.src)
+}
+
+```
+
+```{r}
+t.reads.src = remove.outliers.with.SD(t(src.reads))
+tissue.edata = t(t.reads.src)
+```
+
+hclust try 
+
+```{r}
+sampleTree = hclust(dist(t(tissue.edata)), method = "average")
+ # Plot the sample tree: Open a graphic output window of size 12 by 9 inches
+ # The user should change the dimensions if the window is too large or too small.
+ #sizeGrWindow(12,9)
+ #pdf(file = "Plots/sampleClustering.pdf", width = 12, height = 9);
+par(cex = 0.3);#change this to change the size of the text
+par(mar = c(0,4,2,0))
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
+cex.lab = 1.5,
+cex.axis = 1.5, cex.main = 2)
+```
+
+quantile normalization
+
+```{r}
+BiocManager::install("preprocessCore")
+library(preprocessCore)
+#rows are genes, columns are samples
+quantile.normalize.raw.gtex <- function(edata.mat)
+{
+ norm_edata = normalize.quantiles(as.matrix(edata.mat))
+ rownames(norm_edata) = rownames(edata.mat)
+ colnames(norm_edata) = colnames(edata.mat)
+ return(norm_edata)
+}
+tissue.edata.qn = quantile.normalize.raw.gtex(tissue.edata)
+```
+need to show box plot of the data
+this is end of part 1 (lab 7 end).
+
