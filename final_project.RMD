@@ -68,8 +68,13 @@ The adjacency function needs WGCNA package installed
 
 
 ```{r}
-install.packages("BiocManager")
-BiocManager::install("WGCNA")
+#install.packages("BiocManager")
+
+#BiocManager::install(c("GO.db", "preprocessCore", "impute"));
+#BiocManager::install("WGCNA")
+library("WGCNA")
+
+
 ```
 
 ```{r}
@@ -123,7 +128,7 @@ cex.axis = 1.5, cex.main = 2)
 quantile normalization
 
 ```{r}
-BiocManager::install("preprocessCore")
+#BiocManager::install("preprocessCore")
 library(preprocessCore)
 #rows are genes, columns are samples
 quantile.normalize.raw.gtex <- function(edata.mat)
